@@ -1,64 +1,77 @@
 import streamlit as st
 import numpy as np
-import joblib
-import os
-import h5py
 import cv2
+import h5py
+import os
+import joblib
+import gdown
 
 from utils import extract_features
 
-# =====================
-# LOAD MODEL (SAFE PATH)
-# =====================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# =========================
+# GOOGLE DRIVE FILE IDS
+# =========================
+MODEL_FILE_ID = "YOUR_MODEL_FILE_ID"
+SCALER_FILE_ID = "YOUR_SCALER_FILE_ID"
+IMPUTER_FILE_ID = "YOUR_IMPUTER_FILE_ID"
 
-model = joblib.load(os.path.join(BASE_DIR, "model.pkl"))
-scaler = joblib.load(os.path.join(BASE_DIR, "scaler.pkl"))
-imputer = joblib.load(os.path.join(BASE_DIR, "imputer.pkl"))
+# =========================
+# DOWNLOAD FUNCTION
+# =========================
+def download_file(file_id, output_name):
+    url = f"https://drive.google.com/uc?id={file_id}"
+    if not os.path.exists(output_name):
+        gdown.download(url, output_name, quiet=False)
 
-# =====================
+# =========================
+# DOWNLOAD MODELS
+# =========================
+download_file(MODEL_FILE_ID, "model.pkl")
+download_file(SCALER_FILE_ID, "scaler.pkl")
+download_file(IMPUTER_FILE_ID, "imputer.pkl")
+
+# =========================
+# LOAD MODELS
+# =========================
+model = joblib.load("model.pkl")
+scaler = joblib.load("scaler.pkl")
+imputer = joblib.load("imputer.pkl")
+
+# =========================
 # UI
-# =====================
-st.set_page_config(page_title="Brain Tumor Classifier", layout="centered")
+# =========================
+st.set_page_config(page_title="Brain Tumor AI", layout="centered")
 
 st.title("🧠 Brain Tumor Classification System")
-st.write("Upload an MRI image (.jpg, .png or .mat)")
+st.write("Upload MRI image (.mat or image file)")
 
-# =====================
+# =========================
 # FILE UPLOAD
-# =====================
-file = st.file_uploader("Upload MRI file")
+# =========================
+file = st.file_uploader("Upload File")
 
 if file:
-    try:
-        if file.name.endswith(".mat"):
-            with h5py.File(file, 'r') as f:
-                keys = list(f.keys())
-                st.write("MAT Keys:", keys)
-                img = np.array(f[keys[0]]).T
-        else:
-            file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
-            img = cv2.imdecode(file_bytes, 0)
 
-        if img is None:
-            st.error("❌ Image not loaded properly")
-        else:
-            img = cv2.resize(img, (256, 256))
-            st.image(img, caption="Uploaded Image", use_column_width=True)
+    # ---- Load image ----
+    if file.name.endswith(".mat"):
+        with h5py.File(file, 'r') as f:
+            img = np.array(f['cjdata']['image']).T
+    else:
+        file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
+        img = cv2.imdecode(file_bytes, 0)
 
-            features = extract_features(img)
-            X = np.array(features).reshape(1, -1)
+    img = cv2.resize(img, (256, 256))
+    st.image(img, caption="Input MRI")
 
-            # preprocess
-            X = imputer.transform(X)
-            X = scaler.transform(X)
+    # ---- Feature extraction ----
+    features = extract_features(img)
+    X = np.array(features).reshape(1, -1)
 
-            if st.button("🔍 Predict"):
-                pred = model.predict(X)[0]
-                prob = model.predict_proba(X)[0]
+    # ---- preprocessing ----
+    X = imputer.transform(X)
+    X = scaler.transform(X)
 
-                st.success(f"Prediction: Class {pred}")
-                st.info(f"Confidence: {np.max(prob)*100:.2f}%")
-
-    except Exception as e:
-        st.error(f"Error: {e}")
+    # ---- prediction ----
+    if st.button("Predict"):
+        pred = model.predict(X)
+        st.success(f"Prediction Class: {pred[0]}")

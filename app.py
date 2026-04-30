@@ -12,9 +12,9 @@ from statsmodels.stats.stattools import durbin_watson
 # =========================
 # GOOGLE DRIVE FILE IDS
 # =========================
-MODEL_FILE_ID = "1Cu8QVXtO-YTVMBidQuIKibEINuO8wcU_"
-SCALER_FILE_ID = "1HFqf175O1Y5xhUyOV3wjkEtpsEeWrKPR"
-IMPUTER_FILE_ID = "178PwZ-87uELP-3K1UNqX3HQ_pBNWWREx"
+MODEL_FILE_ID = "150TmdDFmUWUiTxDZ38Qrh46OcoPpukzF"
+SCALER_FILE_ID = "1EwRfrJVpgO-puUsQrmGyB_i2EIwA2R6z"
+IMPUTER_FILE_ID = "1beJUTGBnH16d9CV-jjvN5suLqwtlbLy1"
 
 # =========================
 # DOWNLOAD FUNCTION
@@ -22,10 +22,13 @@ IMPUTER_FILE_ID = "178PwZ-87uELP-3K1UNqX3HQ_pBNWWREx"
 def download_file(file_id, output_name):
     if not os.path.exists(output_name):
         url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        gdown.download(url, output_name, quiet=False)
+        try:
+            gdown.download(url, output_name, quiet=False)
+        except:
+            st.error(f"❌ Failed to download {output_name}. Make sure sharing is ON!")
 
 # =========================
-# DOWNLOAD MODELS
+# DOWNLOAD FILES
 # =========================
 download_file(MODEL_FILE_ID, "model.pkl")
 download_file(SCALER_FILE_ID, "scaler.pkl")
@@ -63,16 +66,16 @@ def extract_features(img):
 st.set_page_config(page_title="Brain Tumor AI", layout="centered")
 
 st.title("🧠 Brain Tumor Classification System")
-st.info("Upload only single MRI (.mat / image)")
+st.warning("Upload only ONE MRI file (.mat / .jpg / .png)")
 
 # =========================
-# UPLOAD
+# FILE UPLOAD
 # =========================
 file = st.file_uploader("Upload MRI File")
 
 if file:
 
-    # ---- Load image ----
+    # ---- Load Image ----
     if file.name.endswith(".mat"):
         with h5py.File(file, 'r') as f:
             img = np.array(f['cjdata']['image']).T
@@ -80,27 +83,38 @@ if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 0)
 
+    # ---- Resize ----
     img = cv2.resize(img, (256, 256))
 
-    # ---- FIX IMAGE ERROR ----
+    # ---- FIX IMAGE RANGE ----
     img = np.nan_to_num(img)
     img = (img - img.min()) / (img.max() - img.min() + 1e-8)
     img = (img * 255).astype(np.uint8)
 
-    st.image(img, caption="Input MRI Image", use_container_width=True)
+    # ---- Display ----
+    st.image(img, caption="MRI Input", use_container_width=True)
 
-    # ---- FEATURES ----
+    # ---- Feature Extraction ----
     features = extract_features(img)
     X = np.array(features).reshape(1, -1)
 
-    # ---- PREPROCESS ----
+    # ---- Preprocessing ----
     X = imputer.transform(X)
     X = scaler.transform(X)
 
-    # ---- PREDICT ----
-    if st.button("Predict"):
+    # ---- Prediction ----
+    if st.button("Predict Tumor"):
+
         pred = model.predict(X)
         prob = model.predict_proba(X)
 
-        st.success(f"🧠 Prediction: {pred[0]}")
+        # Label mapping (update if needed)
+        labels = {
+            0: "No Tumor",
+            1: "Glioma",
+            2: "Meningioma",
+            3: "Pituitary"
+        }
+
+        st.success(f"🧠 Prediction: {labels.get(pred[0], pred[0])}")
         st.info(f"Confidence: {np.max(prob)*100:.2f}%")

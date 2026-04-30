@@ -1,0 +1,8 @@
+streamlit
+numpy
+opencv-python
+h5py
+scikit-learn
+scipy
+statsmodels
+joblib

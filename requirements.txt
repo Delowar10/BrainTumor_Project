@@ -1,8 +1,9 @@
 streamlit
 numpy
-opencv-python-headless
+opencv-python
 h5py
 scikit-learn
 scipy
 statsmodels
 joblib
+gdown

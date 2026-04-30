@@ -1,59 +1,64 @@
 import streamlit as st
 import numpy as np
 import joblib
-import cv2
+import os
 import h5py
+import cv2
 
-from scipy.stats import skew, kurtosis
-from statsmodels.stats.stattools import durbin_watson
+from utils import extract_features
 
 # =====================
-# LOAD MODEL
+# LOAD MODEL (SAFE PATH)
 # =====================
-model = joblib.load("model.pkl")
-scaler = joblib.load("scaler.pkl")
-imputer = joblib.load("imputer.pkl")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+model = joblib.load(os.path.join(BASE_DIR, "model.pkl"))
+scaler = joblib.load(os.path.join(BASE_DIR, "scaler.pkl"))
+imputer = joblib.load(os.path.join(BASE_DIR, "imputer.pkl"))
+
+# =====================
+# UI
+# =====================
+st.set_page_config(page_title="Brain Tumor Classifier", layout="centered")
 
 st.title("🧠 Brain Tumor Classification System")
+st.write("Upload an MRI image (.jpg, .png or .mat)")
 
 # =====================
-# FEATURE EXTRACTION
+# FILE UPLOAD
 # =====================
-def extract_features(img):
-    p = img.flatten().astype(np.float64)
-    p = np.nan_to_num(p)
-
-    return [
-        np.mean(p), np.std(p), np.var(p),
-        np.min(p), np.max(p), np.median(p),
-        skew(p), kurtosis(p),
-        durbin_watson(p)
-    ]
-
-# =====================
-# UPLOAD FILE
-# =====================
-file = st.file_uploader("Upload MRI (.mat or image)")
+file = st.file_uploader("Upload MRI file")
 
 if file:
+    try:
+        if file.name.endswith(".mat"):
+            with h5py.File(file, 'r') as f:
+                keys = list(f.keys())
+                st.write("MAT Keys:", keys)
+                img = np.array(f[keys[0]]).T
+        else:
+            file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
+            img = cv2.imdecode(file_bytes, 0)
 
-    if file.name.endswith(".mat"):
-        with h5py.File(file, 'r') as f:
-            img = np.array(f['cjdata']['image']).T
-    else:
-        file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, 0)
+        if img is None:
+            st.error("❌ Image not loaded properly")
+        else:
+            img = cv2.resize(img, (256, 256))
+            st.image(img, caption="Uploaded Image", use_column_width=True)
 
-    img = cv2.resize(img, (256, 256))
-    st.image(img, caption="Input Image")
+            features = extract_features(img)
+            X = np.array(features).reshape(1, -1)
 
-    features = extract_features(img)
-    X = np.array(features).reshape(1, -1)
+            # preprocess
+            X = imputer.transform(X)
+            X = scaler.transform(X)
 
-    # preprocessing
-    X = imputer.transform(X)
-    X = scaler.transform(X)
+            if st.button("🔍 Predict"):
+                pred = model.predict(X)[0]
+                prob = model.predict_proba(X)[0]
 
-    if st.button("Predict"):
-        pred = model.predict(X)
-        st.success(f"Prediction: Class {pred[0]}")
+                st.success(f"Prediction: Class {pred}")
+                st.info(f"Confidence: {np.max(prob)*100:.2f}%")
+
+    except Exception as e:
+        st.error(f"Error: {e}")

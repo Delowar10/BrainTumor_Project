@@ -12,9 +12,9 @@ from statsmodels.stats.stattools import durbin_watson
 # =========================
 # GOOGLE DRIVE FILE IDS
 # =========================
-MODEL_FILE_ID = "1Cu8QVXtO-YTVMBidQuIKibEINuO8wcU_"   # ✔ তোমারটা দেওয়া আছে
-SCALER_FILE_ID = "PASTE_YOUR_SCALER_ID"
-IMPUTER_FILE_ID = "PASTE_YOUR_IMPUTER_ID"
+MODEL_FILE_ID = "1Cu8QVXtO-YTVMBidQuIKibEINuO8wcU_"
+SCALER_FILE_ID = "1HFqf175O1Y5xhUyOV3wjkEtpsEeWrKPR"
+IMPUTER_FILE_ID = "178PwZ-87uELP-3K1UNqX3HQ_pBNWWREx"
 
 # =========================
 # DOWNLOAD FUNCTION
@@ -22,10 +22,7 @@ IMPUTER_FILE_ID = "PASTE_YOUR_IMPUTER_ID"
 def download_file(file_id, output_name):
     if not os.path.exists(output_name):
         url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        try:
-            gdown.download(url, output_name, quiet=False)
-        except:
-            st.error(f"❌ Failed to download {output_name}. Check Drive sharing!")
+        gdown.download(url, output_name, quiet=False)
 
 # =========================
 # DOWNLOAD MODELS
@@ -61,15 +58,15 @@ def extract_features(img):
     ]
 
 # =========================
-# UI DESIGN
+# UI
 # =========================
 st.set_page_config(page_title="Brain Tumor AI", layout="centered")
 
 st.title("🧠 Brain Tumor Classification System")
-st.write("Upload MRI image (.mat or image file)")
+st.info("Upload only single MRI (.mat / image)")
 
 # =========================
-# FILE UPLOAD
+# UPLOAD
 # =========================
 file = st.file_uploader("Upload MRI File")
 
@@ -85,20 +82,25 @@ if file:
 
     img = cv2.resize(img, (256, 256))
 
+    # ---- FIX IMAGE ERROR ----
+    img = np.nan_to_num(img)
+    img = (img - img.min()) / (img.max() - img.min() + 1e-8)
+    img = (img * 255).astype(np.uint8)
+
     st.image(img, caption="Input MRI Image", use_container_width=True)
 
-    # ---- Feature extraction ----
+    # ---- FEATURES ----
     features = extract_features(img)
     X = np.array(features).reshape(1, -1)
 
-    # ---- Preprocessing ----
+    # ---- PREPROCESS ----
     X = imputer.transform(X)
     X = scaler.transform(X)
 
-    # ---- Prediction ----
-    if st.button("Predict Tumor Type"):
+    # ---- PREDICT ----
+    if st.button("Predict"):
         pred = model.predict(X)
         prob = model.predict_proba(X)
 
-        st.success(f"🧠 Prediction Class: {pred[0]}")
+        st.success(f"🧠 Prediction: {pred[0]}")
         st.info(f"Confidence: {np.max(prob)*100:.2f}%")

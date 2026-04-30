@@ -4,7 +4,12 @@ from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import KNNImputer
 
-# ধরো X, y already তৈরি (তোমার original code থেকে)
+# =====================
+# DUMMY DATA (replace with your dataset)
+# =====================
+# ⚠️ তুমি চাইলে তোমার original X, y use করবে
+X = np.random.rand(200, 9)
+y = np.random.randint(0, 2, 200)
 
 # =====================
 # PREPROCESS
@@ -18,14 +23,14 @@ X = scaler.fit_transform(X)
 # =====================
 # MODEL TRAIN
 # =====================
-model = ExtraTreesClassifier(n_estimators=200, random_state=42)
+model = ExtraTreesClassifier(n_estimators=100, random_state=42)
 model.fit(X, y)
 
 # =====================
-# SAVE EVERYTHING
+# SAVE
 # =====================
 joblib.dump(model, "model.pkl")
 joblib.dump(scaler, "scaler.pkl")
 joblib.dump(imputer, "imputer.pkl")
 
-print("Model saved successfully!")
+print("✅ Model saved successfully!")
